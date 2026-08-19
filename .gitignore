@@ -1,0 +1,42 @@
+# Keil MDK build output directories
+**/MDK-ARM/F407-RoboticArm/
+**/MDK-ARM/LegacyBuild-F407-AutoTracking-Gimbal/
+
+# Keil generated intermediate and output files
+*.o
+*.d
+*.crf
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.lnp
+*.dep
+*.lst
+*.build_log.htm
+*.htm
+*.log
+
+# Keil per-user UI/debug state
+*.uvguix.*
+*.scvd
+*.log.lock
+JLinkLog.txt
+JLinkSettings.ini
+
+# Local AI assistant permissions/state
+**/.claude/settings.local.json
+
+# Python cache and local virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Windows and editor temporary files
+Thumbs.db
+Desktop.ini
+*.bak
+*.tmp
+*.user
