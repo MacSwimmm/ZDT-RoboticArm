@@ -565,6 +565,16 @@
               <FilePath>.\APP\MotorBus.h</FilePath>
             </File>
             <File>
+              <FileName>HostProtocol.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\APP\HostProtocol.c</FilePath>
+            </File>
+            <File>
+              <FileName>HostProtocol.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\APP\HostProtocol.h</FilePath>
+            </File>
+            <File>
               <FileName>ArmControl.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\APP\ArmControl.c</FilePath>
@@ -573,6 +583,16 @@
               <FileName>ArmControl.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\APP\ArmControl.h</FilePath>
+            </File>
+            <File>
+              <FileName>Servo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\APP\Servo.c</FilePath>
+            </File>
+            <File>
+              <FileName>Servo.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\APP\Servo.h</FilePath>
             </File>
           </Files>
         </Group>

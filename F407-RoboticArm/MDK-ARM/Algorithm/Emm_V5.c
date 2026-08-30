@@ -287,6 +287,25 @@ void Emm_V5_Pos_Control(uint8_t addr, uint8_t dir, uint16_t vel, uint8_t acc, ui
   HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, 13);
 }
 
+void Emm_V5_X_Pos_Control(uint8_t addr, uint8_t dir, uint16_t vel_tenth_rpm,
+                          uint32_t angle_tenths, uint8_t mode, bool snF)
+{
+  __IO static uint8_t cmd[16] = {0};
+  cmd[0] = addr;
+  cmd[1] = 0xFB;
+  cmd[2] = dir;
+  cmd[3] = (uint8_t)(vel_tenth_rpm >> 8);
+  cmd[4] = (uint8_t)vel_tenth_rpm;
+  cmd[5] = (uint8_t)(angle_tenths >> 24);
+  cmd[6] = (uint8_t)(angle_tenths >> 16);
+  cmd[7] = (uint8_t)(angle_tenths >> 8);
+  cmd[8] = (uint8_t)angle_tenths;
+  cmd[9] = mode;
+  cmd[10] = snF;
+  cmd[11] = 0x6B;
+  HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, 12);
+}
+
 /**
   * @brief    立即停止
   * @param    addr  ：电机地址

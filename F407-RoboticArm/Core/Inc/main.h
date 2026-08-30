@@ -60,6 +60,10 @@ void Error_Handler(void);
 #define LED_BOARD_Pin GPIO_PIN_1
 #define LED_BOARD_GPIO_Port GPIOA
 
+/* MG90S signal: PA6 / TIM3_CH1. Use separate 5 V servo power and common GND. */
+#define SERVO_PWM_Pin GPIO_PIN_6
+#define SERVO_PWM_GPIO_Port GPIOA
+
 /* Robotic-arm input mapping from the PCB pin assignment. */
 #define ENC1_A_Pin GPIO_PIN_6
 #define ENC1_A_GPIO_Port GPIOB

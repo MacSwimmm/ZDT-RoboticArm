@@ -27,10 +27,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "ArmControl.h"
+#include "HostProtocol.h"
 #include "Encoder.h"
 #include "Key.h"
 #include "MotorBus.h"
 #include "OLED.h"
+#include "Servo.h"
 
 /* USER CODE END Includes */
 
@@ -120,8 +122,10 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_TIM6_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   /*
    * 输入驱动只负责采样、消抖和事件排队；业务动作在主循环 ArmControl 中执行。
@@ -132,8 +136,10 @@ int main(void)
 
   /* MotorBus_Init 会把四个轴置为停止态，并排队发送四轴失能命令。 */
   MotorBus_Init();
+  HostProtocol_Init();
   OLED_Init();
   ArmControl_Init();
+  Servo_Init();
   if (HAL_TIM_Base_Start_IT(&htim6) != HAL_OK) {
     Error_Handler();
   }
@@ -148,6 +154,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     ArmControl_Process();
+    HostProtocol_Process();
     MotorBus_Process();
     OLED_Process();
   }

@@ -112,11 +112,34 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *tim_baseHandle)
     }
 }
 
+void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef *tim_pwmHandle)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    if (tim_pwmHandle->Instance == TIM3) {
+        __HAL_RCC_TIM3_CLK_ENABLE();
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+        GPIO_InitStruct.Pin = SERVO_PWM_Pin;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
+        HAL_GPIO_Init(SERVO_PWM_GPIO_Port, &GPIO_InitStruct);
+    }
+}
+
 void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *tim_baseHandle)
 {
     if (tim_baseHandle->Instance == TIM6) {
         __HAL_RCC_TIM6_CLK_DISABLE();
         HAL_NVIC_DisableIRQ(TIM6_DAC_IRQn);
+    }
+}
+
+void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef *tim_pwmHandle)
+{
+    if (tim_pwmHandle->Instance == TIM3) {
+        __HAL_RCC_TIM3_CLK_DISABLE();
+        HAL_GPIO_DeInit(SERVO_PWM_GPIO_Port, SERVO_PWM_Pin);
     }
 }
 

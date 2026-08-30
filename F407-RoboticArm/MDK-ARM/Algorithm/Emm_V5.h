@@ -88,6 +88,9 @@ void Emm_V5_En_Control(uint8_t addr, bool state, bool snF);
 void Emm_V5_Vel_Control(uint8_t addr, uint8_t dir, uint16_t vel, uint8_t acc, bool snF);
 // 位置模式控制
 void Emm_V5_Pos_Control(uint8_t addr, uint8_t dir, uint16_t vel, uint8_t acc, uint32_t clk, bool raF, bool snF);
+/* X42S X-firmware direct position command: speed is 0.1 RPM, position 0.1 deg. */
+void Emm_V5_X_Pos_Control(uint8_t addr, uint8_t dir, uint16_t vel_tenth_rpm,
+                          uint32_t angle_tenths, uint8_t mode, bool snF);
 // 让电机立即停止运动
 void Emm_V5_Stop_Now(uint8_t addr, bool snF);
 // 触发多机同步开始运动

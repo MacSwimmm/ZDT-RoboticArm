@@ -27,6 +27,8 @@
 #define MOTORBUS_ONLINE_TIMEOUT_MS      1200U
 #define MOTORBUS_MAX_QUERY_MISSES       3U
 #define MOTORBUS_PULSES_PER_REV         3200UL
+/* The installed Zhangdatou drivers run Emm firmware, not X firmware. */
+#define MOTORBUS_X_FIRMWARE             0U
 
 #define MOTOR_FLAG_ENABLED              0x01U
 #define MOTOR_FLAG_STALL                0x04U
@@ -51,10 +53,14 @@ static uint8_t frame_expected;
 
 /* 每一位对应一个轴；命令合并时同一轴只保留最新目标。 */
 static uint8_t target_pending_mask;
+static uint8_t velocity_pending_mask;
+static uint8_t velocity_direction[MOTORBUS_AXIS_COUNT];
+static uint16_t velocity_speed[MOTORBUS_AXIS_COUNT];
 static uint8_t enable_pending_mask;
 static uint8_t disable_pending_mask;
 static uint8_t stop_pending_mask;
 static uint8_t zero_pending_mask;
+static uint8_t reset_clog_pending_mask;
 static uint8_t requested_enable[MOTORBUS_AXIS_COUNT];
 
 static uint8_t query_axis;
@@ -81,6 +87,7 @@ static uint8_t MotorBus_FrameLength(uint8_t code)
     case 0x3AU: return 4U;
     case 0x0AU:
     case 0xF3U:
+    case 0xFBU:
     case 0xFDU:
     case 0xFEU:
         return 4U;
@@ -103,17 +110,26 @@ static uint8_t MotorBus_NextBit(uint8_t mask)
 
 static int16_t MotorBus_PositionToTenths(uint8_t sign, uint32_t raw)
 {
-    /* 驱动器实时位置为一圈 0~65535，转换为 -180.0°~+180.0°。 */
-    int32_t angle = (int32_t)(((raw & 0xFFFFUL) * 3600UL + 32768UL) / 65536UL);
+    int32_t angle;
+
+#if MOTORBUS_X_FIRMWARE
+    /* X42S X firmware reports position in 0.1 degree units. */
+    angle = (int32_t)raw;
+#else
+    /* Emm firmware reports one-turn 0..65535 position. */
+    angle = (int32_t)(((raw & 0xFFFFUL) * 3600UL + 32768UL) / 65536UL);
+#endif
 
     if (sign != 0U) {
         angle = -angle;
     }
-    if (angle > MOTORBUS_MAX_ANGLE_TENTHS) {
+    if (!MOTORBUS_X_FIRMWARE && angle > MOTORBUS_MAX_ANGLE_TENTHS) {
         angle -= 3600L;
-    } else if (angle < MOTORBUS_MIN_ANGLE_TENTHS) {
+    } else if (!MOTORBUS_X_FIRMWARE && angle < MOTORBUS_MIN_ANGLE_TENTHS) {
         angle += 3600L;
     }
+    if (angle > 32767L) angle = 32767L;
+    if (angle < -32768L) angle = -32768L;
     return (int16_t)angle;
 }
 
@@ -166,6 +182,9 @@ static void MotorBus_ParseFrame(const uint8_t *frame, uint8_t length)
     } else if ((code == 0x35U) && (length == 6U)) {
         speed = (uint16_t)(((uint16_t)frame[3] << 8) | frame[4]);
         motor_state[axis].actual_rpm = (frame[2] != 0U) ? -(int16_t)speed : (int16_t)speed;
+#if MOTORBUS_X_FIRMWARE
+        motor_state[axis].actual_rpm = (int16_t)(motor_state[axis].actual_rpm / 10);
+#endif
     } else if ((code == 0x3AU) && (length == 4U)) {
         motor_state[axis].flags = frame[2];
         motor_state[axis].enabled = ((frame[2] & MOTOR_FLAG_ENABLED) != 0U) ? 1U : 0U;
@@ -352,6 +371,26 @@ static uint8_t MotorBus_ProcessPending(uint8_t allow_target)
         return 1U;
     }
 
+    axis = MotorBus_NextBit(velocity_pending_mask);
+    if (axis < MOTORBUS_AXIS_COUNT) {
+        bit = (uint8_t)(1U << axis);
+        velocity_pending_mask &= (uint8_t)~bit;
+        Emm_V5_Vel_Control((uint8_t)(axis + 1U), velocity_direction[axis],
+                           velocity_speed[axis],
+                           motor_profile[axis].accel, false);
+        (void)MotorBus_TxSucceeded();
+        return 2U;
+    }
+
+    axis = MotorBus_NextBit(reset_clog_pending_mask);
+    if (axis < MOTORBUS_AXIS_COUNT) {
+        bit = (uint8_t)(1U << axis);
+        reset_clog_pending_mask &= (uint8_t)~bit;
+        Emm_V5_Reset_Clog_Pro((uint8_t)(axis + 1U));
+        (void)MotorBus_TxSucceeded();
+        return 1U;
+    }
+
     axis = MotorBus_NextBit(disable_pending_mask);
     if (axis < MOTORBUS_AXIS_COUNT) {
         bit = (uint8_t)(1U << axis);
@@ -396,10 +435,20 @@ static uint8_t MotorBus_ProcessPending(uint8_t allow_target)
         target_pending_mask &= (uint8_t)~bit;
         direction = (motor_profile[axis].target_angle_tenths < 0) ? 1U : 0U;
         pulses = MotorBus_AngleToPulses(motor_profile[axis].target_angle_tenths);
+#if MOTORBUS_X_FIRMWARE
+        (void)pulses;
+        Emm_V5_X_Pos_Control((uint8_t)(axis + 1U), direction,
+                             (uint16_t)(motor_profile[axis].speed_rpm * 10U),
+                             (uint32_t)((motor_profile[axis].target_angle_tenths < 0) ?
+                                        -motor_profile[axis].target_angle_tenths :
+                                        motor_profile[axis].target_angle_tenths),
+                             1U, false);
+#else
         Emm_V5_Pos_Control((uint8_t)(axis + 1U), direction,
                            motor_profile[axis].speed_rpm,
                            motor_profile[axis].accel,
                            pulses, true, false);
+#endif
         (void)MotorBus_TxSucceeded();
         return 2U;
     }
@@ -428,10 +477,12 @@ void MotorBus_Init(void)
     frame_count = 0U;
     frame_expected = 0U;
     target_pending_mask = 0U;
+    velocity_pending_mask = 0U;
     enable_pending_mask = 0U;
     disable_pending_mask = 0x0FU;
     stop_pending_mask = 0U;
     zero_pending_mask = 0U;
+    reset_clog_pending_mask = 0U;
     query_axis = 0U;
     query_type = BUS_QUERY_POSITION;
     query_waiting = 0U;
@@ -525,6 +576,22 @@ MotorBusResult_t MotorBus_RequestAngle(uint8_t axis, int16_t target_angle_tenths
     return MOTORBUS_OK;
 }
 
+MotorBusResult_t MotorBus_RequestVelocity(uint8_t axis, uint8_t direction, uint16_t speed_rpm)
+{
+    if (axis >= MOTORBUS_AXIS_COUNT) return MOTORBUS_REJECT_AXIS;
+    if (bus_fault != 0U) return MOTORBUS_REJECT_BUS_FAULT;
+    if (motor_state[axis].online == 0U) return MOTORBUS_REJECT_OFFLINE;
+    if (speed_rpm != 0U) {
+        if (motor_state[axis].zero_valid == 0U) return MOTORBUS_REJECT_ZERO;
+        if (motor_state[axis].enabled == 0U) return MOTORBUS_REJECT_DISABLED;
+        if (motor_state[axis].stopped != 0U) return MOTORBUS_REJECT_STOPPED;
+    }
+    velocity_direction[axis] = (direction != 0U) ? 1U : 0U;
+    velocity_speed[axis] = (speed_rpm > 5000U) ? 5000U : speed_rpm;
+    velocity_pending_mask |= (uint8_t)(1U << axis);
+    return MOTORBUS_OK;
+}
+
 void MotorBus_SetSpeed(uint8_t axis, uint16_t speed_rpm)
 {
     /* 速度是下一条位置命令的曲线参数，不会单独启动电机连续旋转。 */
@@ -552,7 +619,8 @@ void MotorBus_RequestEnable(uint8_t axis, uint8_t enable)
     } else {
         enable_pending_mask &= (uint8_t)~bit;
         disable_pending_mask |= bit;
-        target_pending_mask &= (uint8_t)~bit;
+    target_pending_mask &= (uint8_t)~bit;
+    velocity_pending_mask &= (uint8_t)~bit;
     }
 }
 
@@ -570,6 +638,7 @@ void MotorBus_RequestStop(uint8_t axis)
     if (axis >= MOTORBUS_AXIS_COUNT) return;
     stop_pending_mask |= (uint8_t)(1U << axis);
     target_pending_mask &= (uint8_t)~(1U << axis);
+    velocity_pending_mask &= (uint8_t)~(1U << axis);
     motor_state[axis].stopped = 1U;
 }
 
@@ -588,6 +657,7 @@ void MotorBus_RequestZero(uint8_t axis)
     if (axis >= MOTORBUS_AXIS_COUNT) return;
     /* 清零前先锁定该轴；收到驱动器成功应答后才把 zero_valid 置 1。 */
     MotorBus_RequestStop(axis);
+    disable_pending_mask |= (uint8_t)(1U << axis);
     motor_state[axis].zero_valid = 0U;
     zero_pending_mask |= (uint8_t)(1U << axis);
 }
@@ -599,6 +669,17 @@ void MotorBus_RequestZeroAll(void)
     for (axis = 0U; axis < MOTORBUS_AXIS_COUNT; ++axis) {
         MotorBus_RequestZero(axis);
     }
+}
+
+void MotorBus_RequestResetClog(uint8_t axis)
+{
+    if (axis >= MOTORBUS_AXIS_COUNT) return;
+    reset_clog_pending_mask |= (uint8_t)(1U << axis);
+}
+
+void MotorBus_RequestResetClogAll(void)
+{
+    reset_clog_pending_mask = 0x0FU;
 }
 
 const MotorProfile_t *MotorBus_GetProfile(uint8_t axis)

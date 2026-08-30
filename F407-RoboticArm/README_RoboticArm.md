@@ -22,6 +22,19 @@ several ordinary push-pull TX outputs together. Use an RS485 physical layer or
 separate buses when the actual driver interface cannot support a reliable
 multi-node TTL topology.
 
+The PC host link uses USART2 at 115200 8N1 through the DAP-Link virtual COM
+port: DAP-Link TX -> PA3 (USART2_RX), DAP-Link RX <- PA2 (USART2_TX), and GND
+must be shared. The PC never drives the motor bus directly; `HostProtocol`
+validates commands and submits them to `MotorBus`.
+
+## Gripper servo
+
+The MG90S gripper servo uses TIM3_CH1 on PA6 at 50 Hz. Connect its signal wire
+to PA6, power it from a separate regulated 5 V supply, and connect that supply
+ground to F407 GND. Host command `0x08` carries one angle byte (0-180). The
+500-2500 us pulse mapping is a software default and must be checked against the
+actual servo and gripper linkage before using the endpoints.
+
 ## Safe startup
 
 1. Power on with the mechanism unloaded or mechanically supported.

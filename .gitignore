@@ -34,6 +34,12 @@ __pycache__/
 .venv/
 venv/
 
+# PyInstaller and local application build caches
+**/build/
+**/build_*/
+**/dist/
+**/dist_*/
+
 # Windows and editor temporary files
 Thumbs.db
 Desktop.ini

@@ -50,12 +50,15 @@ void MotorBus_Process(void);
 MotorBusResult_t MotorBus_RequestAngle(uint8_t axis, int16_t target_angle_tenths);
 void MotorBus_SetSpeed(uint8_t axis, uint16_t speed_rpm);
 void MotorBus_SetAccel(uint8_t axis, uint8_t accel);
+MotorBusResult_t MotorBus_RequestVelocity(uint8_t axis, uint8_t direction, uint16_t speed_rpm);
 void MotorBus_RequestEnable(uint8_t axis, uint8_t enable);
 void MotorBus_RequestEnableAll(uint8_t enable);
 void MotorBus_RequestStop(uint8_t axis);
 void MotorBus_RequestStopAll(void);
 void MotorBus_RequestZero(uint8_t axis);
 void MotorBus_RequestZeroAll(void);
+void MotorBus_RequestResetClog(uint8_t axis);
+void MotorBus_RequestResetClogAll(void);
 
 const MotorProfile_t *MotorBus_GetProfile(uint8_t axis);
 const MotorState_t *MotorBus_GetState(uint8_t axis);
